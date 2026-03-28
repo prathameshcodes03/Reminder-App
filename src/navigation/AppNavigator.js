@@ -3,10 +3,9 @@ import { Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
-
+import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import NotificationsScreen from '../screens/app/NotificationsScreen';
@@ -18,19 +17,13 @@ const Tab = createBottomTabNavigator();
 
 const TabIcon = ({ label, focused }) => {
   const icons = { Notifications: '🔔', Profile: '👤', Settings: '⚙️' };
-  return <Text style={{ fontSize: focused ? 22 : 20, opacity: focused ? 1 : 0.5 }}>{icons[label]}</Text>;
+  return <Text style={{ fontSize: focused ? 22 : 19, opacity: focused ? 1 : 0.45 }}>{icons[label]}</Text>;
 };
 
 const MainTabs = () => {
   const { theme } = useTheme();
   const { strings } = useLanguage();
-
-  const tabLabels = {
-    Notifications: strings.reminders,
-    Profile: strings.profile,
-    Settings: strings.settings,
-  };
-
+  const tabLabels = { Notifications: strings.reminders, Profile: strings.profile, Settings: strings.settings };
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -57,14 +50,22 @@ const MainTabs = () => {
   );
 };
 
-const AppNavigator = () => (
-  <NavigationContainer>
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Login">
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
-      <Stack.Screen name="MainTabs" component={MainTabs} />
-    </Stack.Navigator>
-  </NavigationContainer>
-);
+const AppNavigator = () => {
+  const { user } = useAuth();
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
+        {user ? (
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+        ) : (
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
 
 export default AppNavigator;
