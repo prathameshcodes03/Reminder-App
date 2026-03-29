@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Modal, ScrollView, Alert, KeyboardAvoidingView, Platform,
-  Animated, Vibration,
+  Animated,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
@@ -224,8 +225,23 @@ const NotificationsScreen = () => {
     resetModal();
   };
 
+  const playCheckSound = async () => {
+    try {
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
+        { shouldPlay: true, volume: 1.0 }
+      );
+      sound.setOnPlaybackStatusUpdate(status => {
+        if (status.didJustFinish) sound.unloadAsync();
+      });
+    } catch (e) {
+      console.log('Sound error:', e);
+    }
+  };
+
   const handleComplete = async id => {
-    Vibration.vibrate([0, 80, 40, 80]);
+    playCheckSound();
     const updated = reminders.map(r => r.id === id ? { ...r, done: true } : r);
     setReminders(updated);
     await saveReminders(updated);
