@@ -26,7 +26,7 @@ const ProfileScreen = () => {
       await updateProfile(draft);
       setEditing(false);
     } catch (e) {
-      Alert.alert('Error', e.message);
+      Alert.alert('Error', e.response?.data?.message || e.message);
     } finally {
       setSaving(false);
     }

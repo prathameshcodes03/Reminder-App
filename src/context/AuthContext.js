@@ -1,101 +1,92 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  registerUser, loginUser, getProfile,
+  updateProfile as apiUpdateProfile,
+  getReminders as apiGetReminders,
+  createReminder as apiCreateReminder,
+  completeReminder as apiCompleteReminder,
+  deleteReminder as apiDeleteReminder,
+  setAuthToken,
+} from '../api/api';
 
 const AuthContext = createContext();
-
-const USERS_KEY = '@remindme_users';
-const SESSION_KEY = '@remindme_session';
+const TOKEN_KEY = '@remindme_token';
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Restore session from saved JWT on app open
   useEffect(() => { restoreSession(); }, []);
 
   const restoreSession = async () => {
     try {
-      const json = await AsyncStorage.getItem(SESSION_KEY);
-      if (json) setUser(JSON.parse(json));
+      const token = await AsyncStorage.getItem(TOKEN_KEY);
+      if (token) {
+        setAuthToken(token);
+        const res = await getProfile();
+        setUser(res.data.user);
+      }
     } catch (e) {
-      console.log('Session restore error:', e);
+      console.log('Session restore failed:', e.message);
+      await AsyncStorage.removeItem(TOKEN_KEY);
     } finally {
       setLoading(false);
     }
   };
 
-  const getUsers = async () => {
-    try {
-      const json = await AsyncStorage.getItem(USERS_KEY);
-      return json ? JSON.parse(json) : [];
-    } catch { return []; }
-  };
-
-  const saveUsers = async (users) => {
-    await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
-  };
-
   const register = async ({ name, email, password }) => {
-    const users = await getUsers();
-    if (users.find(u => u.email.toLowerCase() === email.toLowerCase()))
-      throw new Error('Email already registered');
-    const newUser = {
-      id: Date.now().toString(),
-      name, email, password,
-      phone: '', role: 'Student',
-      joined: new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
-      reminders: [],
-    };
-    await saveUsers([...users, newUser]);
-    return true;
+    const res = await registerUser({ name, email, password });
+    return res.data;
   };
 
   const login = async ({ email, password }) => {
-    const users = await getUsers();
-    const found = users.find(
-      u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    if (!found) throw new Error('Invalid email or password');
-    const session = { ...found };
-    delete session.password;
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    setUser(session);
-    return session;
+    const res = await loginUser({ email, password });
+    const { token, user: loggedUser } = res.data;
+    await AsyncStorage.setItem(TOKEN_KEY, token);
+    setAuthToken(token);
+    setUser(loggedUser);
+    return loggedUser;
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem(SESSION_KEY);
+    await AsyncStorage.removeItem(TOKEN_KEY);
+    setAuthToken(null);
     setUser(null);
   };
 
   const updateProfile = async (updates) => {
-    const users = await getUsers();
-    const idx = users.findIndex(u => u.id === user.id);
-    if (idx === -1) throw new Error('User not found');
-    const updated = { ...users[idx], ...updates };
-    users[idx] = updated;
-    await saveUsers(users);
-    const newSession = { ...updated };
-    delete newSession.password;
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
-    setUser(newSession);
+    const res = await apiUpdateProfile(updates);
+    setUser(res.data.user);
+    return res.data.user;
   };
 
   const getReminders = async () => {
-    const users = await getUsers();
-    const found = users.find(u => u.id === user.id);
-    return found ? found.reminders || [] : [];
+    const res = await apiGetReminders();
+    return res.data.reminders;
   };
 
-  const saveReminders = async (reminders) => {
-    const users = await getUsers();
-    const idx = users.findIndex(u => u.id === user.id);
-    if (idx === -1) return;
-    users[idx].reminders = reminders;
-    await saveUsers(users);
+  const saveReminder = async (reminderData) => {
+    const res = await apiCreateReminder(reminderData);
+    return res.data.reminder;
+  };
+
+  const markComplete = async (id) => {
+    await apiCompleteReminder(id);
+  };
+
+  const removeReminder = async (id) => {
+    await apiDeleteReminder(id);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile, getReminders, saveReminders }}>
+    <AuthContext.Provider value={{
+      user, loading,
+      login, register, logout,
+      updateProfile,
+      getReminders, saveReminder, markComplete, removeReminder,
+    }}>
       {children}
     </AuthContext.Provider>
   );

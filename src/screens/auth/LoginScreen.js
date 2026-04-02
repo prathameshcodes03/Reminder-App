@@ -20,7 +20,7 @@ const LoginScreen = ({ navigation }) => {
     try {
       await login({ email: email.trim(), password });
     } catch (e) {
-      Alert.alert('Login Failed', e.message);
+      Alert.alert('Login Failed', e.response?.data?.message || e.message);
     } finally {
       setLoading(false);
     }

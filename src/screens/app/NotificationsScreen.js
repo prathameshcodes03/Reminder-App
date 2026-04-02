@@ -67,7 +67,7 @@ const sp = StyleSheet.create({
 
 // ─── Reminder Card ────────────────────────────────────────────────────────────
 const ReminderCard = ({ item, onComplete, onDelete, theme }) => {
-  const isOverdue = new Date(item.isoDate) < new Date() && !item.done;
+  const isOverdue = new Date(item.isoDate || item.iso_date) < new Date() && !item.done;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handleComplete = () => {
@@ -147,7 +147,7 @@ const YEARS = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear(
 const NotificationsScreen = () => {
   const { theme } = useTheme();
   const { strings } = useLanguage();
-  const { user, getReminders, saveReminders } = useAuth();
+  const { user, getReminders, saveReminder, markComplete, removeReminder } = useAuth();
 
   const [reminders, setReminders] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -176,8 +176,12 @@ const NotificationsScreen = () => {
   useEffect(() => { loadReminders(); }, [user]);
 
   const loadReminders = async () => {
-    const data = await getReminders();
-    setReminders(data);
+    try {
+      const data = await getReminders();
+      setReminders(data);
+    } catch (e) {
+      console.log('Load reminders error:', e.message);
+    }
   };
 
   const buildIsoDate = () => {
@@ -212,17 +216,19 @@ const NotificationsScreen = () => {
   const handleSave = async () => {
     const isoDate = buildIsoDate();
     const { displayDate, displayTime } = formatDisplay(isoDate);
-    const newReminder = {
-      id: Date.now().toString(),
-      title: title.trim(),
-      description: description.trim(),
-      isoDate, displayDate, displayTime,
-      done: false,
-    };
-    const updated = [newReminder, ...reminders];
-    setReminders(updated);
-    await saveReminders(updated);
-    resetModal();
+    try {
+      const saved = await saveReminder({
+        title: title.trim(),
+        description: description.trim(),
+        iso_date: isoDate,
+        display_date: displayDate,
+        display_time: displayTime,
+      });
+      setReminders(prev => [{ ...saved, isoDate: saved.iso_date, displayDate: saved.display_date, displayTime: saved.display_time }, ...prev]);
+      resetModal();
+    } catch (e) {
+      Alert.alert('Error', 'Could not save reminder. Check your connection.');
+    }
   };
 
   const playCheckSound = async () => {
@@ -242,9 +248,12 @@ const NotificationsScreen = () => {
 
   const handleComplete = async id => {
     playCheckSound();
-    const updated = reminders.map(r => r.id === id ? { ...r, done: true } : r);
-    setReminders(updated);
-    await saveReminders(updated);
+    try {
+      await markComplete(id);
+      setReminders(prev => prev.map(r => r.id === id ? { ...r, done: true, is_done: 1 } : r));
+    } catch (e) {
+      Alert.alert('Error', 'Could not complete reminder.');
+    }
   };
 
   const handleDelete = id => {
@@ -253,9 +262,12 @@ const NotificationsScreen = () => {
       {
         text: strings.delete, style: 'destructive',
         onPress: async () => {
-          const updated = reminders.filter(r => r.id !== id);
-          setReminders(updated);
-          await saveReminders(updated);
+          try {
+            await removeReminder(id);
+            setReminders(prev => prev.filter(r => r.id !== id));
+          } catch (e) {
+            Alert.alert('Error', 'Could not delete reminder.');
+          }
         },
       },
     ]);
