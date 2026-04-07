@@ -5,7 +5,10 @@ import axios from 'axios';
 // Physical Device   → http://YOUR_LAN_IP:3000  (run ifconfig)
 // After adb reverse → http://localhost:3000
 // ─────────────────────────────────────────────────────────────
-const BASE_URL = 'https://xxxx.ngrok-free.app';
+
+
+
+const BASE_URL = "https://dichasial-atlas-generally.ngrok-free.dev";
 
 const api = axios.create({
   baseURL: BASE_URL,
