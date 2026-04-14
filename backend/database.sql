@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS users (
   phone       VARCHAR(20)   DEFAULT '',
   role        VARCHAR(100)  DEFAULT 'Student',
   joined      VARCHAR(50)   DEFAULT '',
-  created_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
+  created_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- ── Reminders Table ──────────────────────────────────────────
@@ -24,15 +25,17 @@ CREATE TABLE IF NOT EXISTS reminders (
   id            INT AUTO_INCREMENT PRIMARY KEY,
   user_id       INT           NOT NULL,
   title         VARCHAR(200)  NOT NULL,
-  description   TEXT          DEFAULT '',
+  description   TEXT,
   iso_date      VARCHAR(50)   NOT NULL,
   display_date  VARCHAR(50)   DEFAULT '',
   display_time  VARCHAR(50)   DEFAULT '',
   is_done       TINYINT(1)    DEFAULT 0,
   created_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  updated_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_reminders_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- ── Indexes for performance ───────────────────────────────────
 CREATE INDEX idx_reminders_user_id ON reminders(user_id);
 CREATE INDEX idx_users_email       ON users(email);
+CREATE INDEX idx_reminders_user_due_date ON reminders(user_id, iso_date);

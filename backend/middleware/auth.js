@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = 'remindme_secret_key_2025';
+const config = require('../config');
 
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -9,7 +9,7 @@ const authMiddleware = (req, res, next) => {
     return res.status(401).json({ message: 'Access denied. No token provided.' });
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, config.app.jwtSecret);
     req.userId = decoded.id;
     req.userEmail = decoded.email;
     next();

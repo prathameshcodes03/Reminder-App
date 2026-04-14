@@ -1,24 +1,35 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 
 // ─────────────────────────────────────────────────────────────
 // Android Emulator  → http://10.0.2.2:3000
-// Physical Device   → http://YOUR_LAN_IP:3000  (run ifconfig)
-// After adb reverse → http://localhost:3000
+// iOS Simulator/Web → http://localhost:3000
+// Physical Device   → set EXPO_PUBLIC_API_URL=http://YOUR_LAN_IP:3000
 // ─────────────────────────────────────────────────────────────
+const getBaseUrl = () => {
+  const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (envUrl) {
+    return envUrl;
+  }
 
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:3000';
+  }
 
+  return 'http://localhost:3000';
+};
 
-const BASE_URL = "https://dichasial-atlas-generally.ngrok-free.dev";
+const BASE_URL = getBaseUrl();
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000,
+  timeout: 8000,
   headers: { 'Content-Type': 'application/json' },
 });
 
 // Log every request and response for debugging
 api.interceptors.request.use(req => {
-  console.log(`📤 ${req.method.toUpperCase()} ${req.baseURL}${req.url}`);
+  console.log(`📤 ${req.method?.toUpperCase()} ${req.baseURL}${req.url}`);
   if (req.data) console.log('📦 Body:', JSON.stringify(req.data));
   return req;
 });

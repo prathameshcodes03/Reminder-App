@@ -4,7 +4,7 @@ import {
   Modal, ScrollView, Alert, KeyboardAvoidingView, Platform,
   Animated,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
@@ -224,30 +224,23 @@ const NotificationsScreen = () => {
         display_date: displayDate,
         display_time: displayTime,
       });
-      setReminders(prev => [{ ...saved, isoDate: saved.iso_date, displayDate: saved.display_date, displayTime: saved.display_time }, ...prev]);
+      setReminders(prev => [saved, ...prev]);
       resetModal();
     } catch (e) {
-      Alert.alert('Error', 'Could not save reminder. Check your connection.');
+      Alert.alert('Error', e.response?.data?.message || 'Could not save reminder. Check your connection.');
     }
   };
 
-  const playCheckSound = async () => {
+  const playCheckFeedback = async () => {
     try {
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
-        { shouldPlay: true, volume: 1.0 }
-      );
-      sound.setOnPlaybackStatusUpdate(status => {
-        if (status.didJustFinish) sound.unloadAsync();
-      });
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
-      console.log('Sound error:', e);
+      console.log('Haptics error:', e);
     }
   };
 
   const handleComplete = async id => {
-    playCheckSound();
+    playCheckFeedback();
     try {
       await markComplete(id);
       setReminders(prev => prev.map(r => r.id === id ? { ...r, done: true, is_done: 1 } : r));
@@ -328,7 +321,7 @@ const NotificationsScreen = () => {
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={item => item.id}
+          keyExtractor={item => String(item.id)}
           renderItem={({ item }) => (
             <ReminderCard item={item} onComplete={handleComplete} onDelete={handleDelete} theme={theme} />
           )}

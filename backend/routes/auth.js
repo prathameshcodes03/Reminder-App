@@ -2,24 +2,32 @@ const express  = require('express');
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const db       = require('../db');
+const config   = require('../config');
+const { sanitizeUser } = require('../utils');
 
 const router = express.Router();
-const JWT_SECRET = 'remindme_secret_key_2025';
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ── POST /api/auth/register ───────────────────────────────────
 router.post('/register', async (req, res) => {
   const { name, email, password, phone = '', role = 'Student' } = req.body;
+  const normalizedEmail = email?.toLowerCase().trim();
+  const normalizedName = name?.trim();
 
-  if (!name || !email || !password)
+  if (!normalizedName || !normalizedEmail || !password)
     return res.status(400).json({ message: 'Name, email and password are required' });
+
+  if (!emailRegex.test(normalizedEmail))
+    return res.status(400).json({ message: 'Please enter a valid email address' });
 
   if (password.length < 6)
     return res.status(400).json({ message: 'Password must be at least 6 characters' });
 
   try {
     // Check duplicate email
-    const [existing] = await db.execute(
-      'SELECT id FROM users WHERE email = ?', [email.toLowerCase()]
+    const existing = await db.query(
+      'SELECT id FROM users WHERE email = ?', [normalizedEmail]
     );
     if (existing.length > 0)
       return res.status(409).json({ message: 'Email already registered' });
@@ -32,9 +40,9 @@ router.post('/register', async (req, res) => {
     });
 
     // Insert user
-    const [result] = await db.execute(
+    const result = await db.run(
       'INSERT INTO users (name, email, password, phone, role, joined) VALUES (?, ?, ?, ?, ?, ?)',
-      [name.trim(), email.toLowerCase().trim(), hashed, phone, role, joined]
+      [normalizedName, normalizedEmail, hashed, phone?.trim() || '', role?.trim() || 'Student', joined]
     );
 
     res.status(201).json({
@@ -51,13 +59,14 @@ router.post('/register', async (req, res) => {
 // ── POST /api/auth/login ──────────────────────────────────────
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
+  const normalizedEmail = email?.toLowerCase().trim();
 
-  if (!email || !password)
+  if (!normalizedEmail || !password)
     return res.status(400).json({ message: 'Email and password are required' });
 
   try {
-    const [rows] = await db.execute(
-      'SELECT * FROM users WHERE email = ?', [email.toLowerCase().trim()]
+    const rows = await db.query(
+      'SELECT * FROM users WHERE email = ?', [normalizedEmail]
     );
 
     if (rows.length === 0)
@@ -72,14 +81,11 @@ router.post('/login', async (req, res) => {
     // Create JWT token
     const token = jwt.sign(
       { id: user.id, email: user.email },
-      JWT_SECRET,
+      config.app.jwtSecret,
       { expiresIn: '7d' }
     );
 
-    // Return user without password
-    const { password: _pw, ...safeUser } = user;
-
-    res.json({ message: 'Login successful', token, user: safeUser });
+    res.json({ message: 'Login successful', token, user: sanitizeUser(user) });
 
   } catch (err) {
     console.error('Login error:', err);

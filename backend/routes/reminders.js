@@ -11,11 +11,11 @@ router.use(authMiddleware);
 // Get all reminders for the logged-in user
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await db.execute(
+    const rows = await db.query(
       `SELECT id, title, description, iso_date, display_date, display_time, is_done, created_at
        FROM reminders
        WHERE user_id = ?
-       ORDER BY created_at DESC`,
+       ORDER BY iso_date ASC, created_at DESC`,
       [req.userId]
     );
 
@@ -37,14 +37,17 @@ router.post('/', async (req, res) => {
   if (!title || !iso_date)
     return res.status(400).json({ message: 'Title and date are required' });
 
+  if (Number.isNaN(new Date(iso_date).getTime()))
+    return res.status(400).json({ message: 'Please provide a valid reminder date' });
+
   try {
-    const [result] = await db.execute(
+    const result = await db.run(
       `INSERT INTO reminders (user_id, title, description, iso_date, display_date, display_time, is_done)
        VALUES (?, ?, ?, ?, ?, ?, 0)`,
       [req.userId, title.trim(), description.trim(), iso_date, display_date, display_time]
     );
 
-    const [rows] = await db.execute(
+    const rows = await db.query(
       'SELECT * FROM reminders WHERE id = ?', [result.insertId]
     );
 
@@ -60,17 +63,22 @@ router.post('/', async (req, res) => {
 // ── PUT /api/reminders/:id/complete ──────────────────────────
 // Mark a reminder as done
 router.put('/:id/complete', async (req, res) => {
+  const reminderId = Number(req.params.id);
+
+  if (!Number.isInteger(reminderId))
+    return res.status(400).json({ message: 'Invalid reminder id' });
+
   try {
-    const [check] = await db.execute(
+    const check = await db.query(
       'SELECT id FROM reminders WHERE id = ? AND user_id = ?',
-      [req.params.id, req.userId]
+      [reminderId, req.userId]
     );
     if (check.length === 0)
       return res.status(404).json({ message: 'Reminder not found' });
 
-    await db.execute(
+    await db.run(
       'UPDATE reminders SET is_done = 1 WHERE id = ? AND user_id = ?',
-      [req.params.id, req.userId]
+      [reminderId, req.userId]
     );
 
     res.json({ message: 'Reminder marked as complete' });
@@ -84,17 +92,22 @@ router.put('/:id/complete', async (req, res) => {
 // ── DELETE /api/reminders/:id ─────────────────────────────────
 // Delete a reminder
 router.delete('/:id', async (req, res) => {
+  const reminderId = Number(req.params.id);
+
+  if (!Number.isInteger(reminderId))
+    return res.status(400).json({ message: 'Invalid reminder id' });
+
   try {
-    const [check] = await db.execute(
+    const check = await db.query(
       'SELECT id FROM reminders WHERE id = ? AND user_id = ?',
-      [req.params.id, req.userId]
+      [reminderId, req.userId]
     );
     if (check.length === 0)
       return res.status(404).json({ message: 'Reminder not found' });
 
-    await db.execute(
+    await db.run(
       'DELETE FROM reminders WHERE id = ? AND user_id = ?',
-      [req.params.id, req.userId]
+      [reminderId, req.userId]
     );
 
     res.json({ message: 'Reminder deleted' });

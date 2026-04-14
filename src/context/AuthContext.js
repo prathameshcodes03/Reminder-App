@@ -12,6 +12,15 @@ import {
 
 const AuthContext = createContext();
 const TOKEN_KEY = '@remindme_token';
+const SESSION_RESTORE_TIMEOUT_MS = 4000;
+
+const normalizeReminder = (reminder) => ({
+  ...reminder,
+  isoDate: reminder.isoDate ?? reminder.iso_date,
+  displayDate: reminder.displayDate ?? reminder.display_date,
+  displayTime: reminder.displayTime ?? reminder.display_time,
+  done: Boolean(reminder.done ?? reminder.is_done),
+});
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser]       = useState(null);
@@ -23,14 +32,24 @@ export const AuthProvider = ({ children }) => {
   const restoreSession = async () => {
     try {
       const token = await AsyncStorage.getItem(TOKEN_KEY);
-      if (token) {
-        setAuthToken(token);
-        const res = await getProfile();
-        setUser(res.data.user);
+      if (!token) {
+        return;
       }
+
+      setAuthToken(token);
+
+      const res = await Promise.race([
+        getProfile(),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Session restore timeout')), SESSION_RESTORE_TIMEOUT_MS);
+        }),
+      ]);
+
+      setUser(res.data.user);
     } catch (e) {
       console.log('Session restore failed:', e.message);
       await AsyncStorage.removeItem(TOKEN_KEY);
+      setAuthToken(null);
     } finally {
       setLoading(false);
     }
@@ -64,12 +83,12 @@ export const AuthProvider = ({ children }) => {
 
   const getReminders = async () => {
     const res = await apiGetReminders();
-    return res.data.reminders;
+    return res.data.reminders.map(normalizeReminder);
   };
 
   const saveReminder = async (reminderData) => {
     const res = await apiCreateReminder(reminderData);
-    return res.data.reminder;
+    return normalizeReminder(res.data.reminder);
   };
 
   const markComplete = async (id) => {
